@@ -43,7 +43,7 @@ DIRW="$2"
 # ensemble members
 ensblm="`seq -f "%02g" 0 1 4`" # 4 or 10 (on Wednesdays)
 # server address
-SERVER=https://noaa-nws-gefswaves-reforecast-pds.s3.amazonaws.com/
+SERVER=https://noaa-nws-gefswaves-reforecast-pds.s3.amazonaws.com/index.html#
 # https://noaa-nws-gefswaves-reforecast-pds.s3.amazonaws.com/index.html#GEFSv12/reforecast/2000/20000108/gridded/
 # gefs.wave.20000108.p01.global.0p25.grib2
 
