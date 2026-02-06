@@ -99,6 +99,22 @@ def contour_to_kml(lon, lat, Z, levels, lname, tstart, tend, pcolors, filename):
         a = int(alpha * 255)
         return f"{a:02x}{int(b*255):02x}{int(g*255):02x}{int(r*255):02x}"
 
+    def ensure_counter_clockwise(coords):
+        if len(coords) < 4:
+            return coords
+
+        area = sum((coords[i+1][0] - coords[i][0]) * (coords[i+1][1] + coords[i][1]) 
+                  for i in range(len(coords)-1))
+        return coords if area < 0 else coords[::-1]
+
+    def ensure_clockwise(coords):
+        if len(coords) < 4:
+            return coords
+
+        area = sum((coords[i+1][0] - coords[i][0]) * (coords[i+1][1] + coords[i][1]) 
+                  for i in range(len(coords)-1))
+        return coords if area > 0 else coords[::-1]
+
     kml = simplekml.Kml()
     kml.document.name = f"Probability {lname}, {tstart} to {tend}"
 
@@ -109,8 +125,9 @@ def contour_to_kml(lon, lat, Z, levels, lname, tstart, tend, pcolors, filename):
         shared_style.linestyle.color = mpl_color_to_kml(pcolors[i], 1.0)
         shared_style.linestyle.width = 3
         shared_style.polystyle.color = mpl_color_to_kml(pcolors[i], 0.3)
-        shared_style.polystyle.fill = 1
+        shared_style.polystyle.fill = 0
         shared_style.polystyle.outline = 1
+        shared_style.polystyle.tessellate = 0
         shared_style.balloonstyle.text = (
             f"<![CDATA[<b>Probability:</b> P ≥ {lvl:.2f}<br>"
             f"<b>Date Range:</b> {tstart} to {tend}]]>")
@@ -124,10 +141,10 @@ def contour_to_kml(lon, lat, Z, levels, lname, tstart, tend, pcolors, filename):
     lat_min, lat_max = lat.min(), lat.max()
     bg = kml.newpolygon(
         name="Model domain",
-        outerboundaryis=[(lon_min, lat_min, 0),(lon_max, lat_min, 0),
-                         (lon_max, lat_max, 0),(lon_min, lat_max, 0),(lon_min, lat_min, 0)])
+        outerboundaryis=[(round(lon_min,2), round(lat_min,2), 0),(round(lon_max,2), round(lat_min,2), 0),
+                         (round(lon_max,2), round(lat_max,2), 0),(round(lon_min,2), round(lat_max,2), 0),(round(lon_min,2), round(lat_min,2), 0)])
     bg.style = bg_style
-    bg.altitudemode = simplekml.AltitudeMode.relativetoground
+    bg.altitudemode = simplekml.AltitudeMode.absolute
 
     # --- 3. CONTOURS ---
     csf = plt.contourf(lon, lat, Z, levels=levels)
@@ -152,21 +169,26 @@ def contour_to_kml(lon, lat, Z, levels, lname, tstart, tend, pcolors, filename):
         geoms = [merged] if merged.geom_type == "Polygon" else list(merged.geoms)
 
         for k, g in enumerate(geoms):
+            # Fix winding order
             exterior_coords = [(round(x,2), round(y,2), 0) for x,y in g.exterior.coords]
-            interiors_coords = [[(round(x,2), round(y,2),0) for x,y in ring.coords] for ring in g.interiors]
+            exterior_coords = ensure_counter_clockwise(exterior_coords)
+            
+            interiors_coords = []
+            for ring in g.interiors:
+                inner = [(round(x,2), round(y,2), 0) for x,y in ring.coords]
+                interiors_coords.append(ensure_clockwise(inner))
 
-            pol = folder.newpolygon(
-                name=f"{lname} | P {lvl_lower:.2f}–{lvl_upper:.2f} | #{k+1}",
-                outerboundaryis=exterior_coords
-            )
+            pol = folder.newpolygon( name=f"{lname} | P {lvl_lower:.2f}–{lvl_upper:.2f} | #{k+1}",
+                outerboundaryis=exterior_coords)
+
             for inner in interiors_coords:
                 pol.innerboundaryis.append(inner)
 
             pol.style = styles_lookup[lvl_lower]
-            pol.draworder = int(lvl_lower * 100)
-            pol.altitudemode = simplekml.AltitudeMode.relativetoground
+            pol.style.polystyle.fill = 0
+            pol.draworder = int(1+lvl_lower * 100)
+            pol.altitudemode = simplekml.AltitudeMode.absolute
             pol.extrude = 0
-            pol.altitude = lvl_lower * 0.01
 
     # --- 4. SAVE KML ---
     kml.document.timespan.begin = tstart

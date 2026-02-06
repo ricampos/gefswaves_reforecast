@@ -24,8 +24,8 @@ mvar_hs: "Significant height of combined wind waves and swell"
 # Domain for the plots (Pacific Ocean). There are 2 latmin, latmin (general), and latminhs (hurricane season)
 lonmin: 115
 lonmax: 290
-latmin: -55
-latminhs: -40
+latmin: -47
+latminhs: -47
 latmax: 82
 # number of ensemble members (control+perturbed)
 nenm: 31
