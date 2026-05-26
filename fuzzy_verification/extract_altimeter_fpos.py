@@ -106,15 +106,15 @@ if __name__ == "__main__":
     # power of initial array 10**pia (size) that will be used to allocate satellite data (faster than append)
     pia=10
     # Satellite missions available at AODN dataset.
-    sdname=np.array(['JASON3','JASON2','CRYOSAT2','JASON1','HY2','HY2B','SARAL','SENTINEL3A','ENVISAT','ERS1','ERS2','GEOSAT','GFO','TOPEX','SENTINEL3B','CFOSAT','SENTINEL6A'])
-    sname=np.array(['JASON-3','JASON-2','CRYOSAT-2','JASON-1','HY-2','HY-2B','SARAL','SENTINEL-3A','ENVISAT','ERS-1','ERS-2','GEOSAT','GFO','TOPEX','SENTINEL-3B','CFOSAT','SENTINEL-6A'])
+    sdname=np.array(['JASON3','JASON2','CRYOSAT2','JASON1','HY2','HY2B','SARAL','SENTINEL3A','ENVISAT','ERS1','ERS2','GEOSAT','GFO','TOPEX','SENTINEL3B','CFOSAT','SENTINEL6A','SWOT'])
+    sname=np.array(['JASON-3','JASON-2','CRYOSAT-2','JASON-1','HY-2','HY-2B','SARAL','SENTINEL-3A','ENVISAT','ERS-1','ERS-2','GEOSAT','GFO','TOPEX','SENTINEL-3B','CFOSAT','SENTINEL-6A','SWOT'])
 
     # Altimeter Quality Control parameters
     max_swh_rms = 1.5  # Max RMS of the band significant wave height
     max_sig0_rms = 0.8 # Max RMS of the backscatter coefficient
     max_swh_qc = 2.0 # Max SWH Ku band quality control
     hsmax=20.; wspmax=80.
-    min_swh_numval = np.array([17,17,17,17,17,17,17,17,17,17,17,-np.inf,3,7,17,-np.inf,17])
+    min_swh_numval = np.array([17,17,17,17,17,17,17,17,17,17,17,-np.inf,3,7,17,-np.inf,17,17])
 
     # --- INPUT ARRAY Information ---
 
@@ -137,7 +137,7 @@ if __name__ == "__main__":
         ast=np.double(np.zeros((10**pia),'d')); adfc=np.zeros((10**pia),'f')
         aslat=np.zeros((10**pia),'f'); aslon=np.zeros((10**pia),'f')
         ahskcal=np.zeros((10**pia),'f'); awndcal=np.zeros((10**pia),'f')
-        asig0knstd=np.zeros((10**pia),'f'); aswhknobs=np.zeros((10**pia),'f')
+        asig0knstd=np.zeros((10**pia),'f')
         aswhknstd=np.zeros((10**pia),'f'); aswhkqc=np.zeros((10**pia),'f')
         ii=0
         for s in range(0,np.size(sdname)):
@@ -177,13 +177,17 @@ if __name__ == "__main__":
 
                             if ii+np.size(st) <= ast.shape[0] :
                                 if (st.shape[0]==wndcal.shape[0]) and (slat.shape[0]==slon.shape[0]) and (hskcal.shape[0]==wndcal.shape[0]) :    
+
+                                    indenobs=np.where(swhknobs<min_swh_numval[s])
+                                    if size(indenobs)>1:
+                                        hskcal[indenobs[0]]=-999.
+
                                     ast[ii:ii+st.shape[0]]=np.array(st).astype('double')
                                     aslat[ii:ii+st.shape[0]]=np.array(slat).astype('float')
                                     aslon[ii:ii+st.shape[0]]=np.array(slon).astype('float')
                                     ahskcal[ii:ii+st.shape[0]]=np.array(hskcal).astype('float')
                                     awndcal[ii:ii+st.shape[0]]=np.array(wndcal).astype('float')
                                     asig0knstd[ii:ii+st.shape[0]]=np.array(sig0knstd).astype('float')
-                                    aswhknobs[ii:ii+st.shape[0]]=np.array(swhknobs).astype('float')
                                     aswhknstd[ii:ii+st.shape[0]]=np.array(swhknstd).astype('float')
                                     aswhkqc[ii:ii+st.shape[0]]=np.array(swhkqc).astype('float')
                                     adfc[ii:ii+st.shape[0]]=np.array(dfc).astype('float')
@@ -202,8 +206,8 @@ if __name__ == "__main__":
         print('  Running collocation ... ')
         # Simplified Quality Control Check ----
         adatemin=np.nanmin(ftime)-3600.; adatemax=np.nanmax(ftime)+3600.
-        indq = np.where( (adfc>=mindfc) & (aswhknstd<=max_swh_rms) & (asig0knstd<=max_sig0_rms) & (aswhknobs>=min_swh_numval[s]) & (aswhkqc<=max_swh_qc) & (ahskcal>0.1) & (ahskcal<hsmax) & (awndcal>0.2) & (awndcal<wspmax) & (ast>=adatemin) & (ast<=adatemax) )     
-        del asig0knstd,aswhknobs,aswhknstd,aswhkqc,adatemin,adatemax,adfc
+        indq = np.where( (adfc>=mindfc) & (aswhknstd<=max_swh_rms) & (asig0knstd<=max_sig0_rms) & (aswhkqc<=max_swh_qc) & (ahskcal>0.1) & (ahskcal<hsmax) & (awndcal>0.2) & (awndcal<wspmax) & (ast>=adatemin) & (ast<=adatemax) )     
+        del asig0knstd,aswhknstd,aswhkqc,adatemin,adatemax,adfc
 
         if np.size(indq)>10:
             ii=0 # apply quality control

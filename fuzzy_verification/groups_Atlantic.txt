@@ -9,17 +9,4 @@ na_tropics_east 29,33,34
 na_gulf 8,9,10,11
 na_caribean 13,14
 ndbc_points 0,1,2,3,4,5,6,7,8,9,10,11,12
-# ndbc_points 0,1,6,12
-
-# na_labrador_greenland 15,16,17
-# na_north_europe 20,21
-# na_europe 22,24,25
-# na_center_north 19,23,24,26,30
-# na_us_eastcoast_s 0,1,5,6
-# na_us_eastcoast_n 12,18,29
-# na_tropics_west 2,3,4,5,7
-# na_tropics_east 28,32,33
-# na_gulf 8,9,10,11
-# na_caribean 13,14
-# ndbc_points 0,1,2,3,4,5,6,7,8,9,10,11,12
-## ndbc_points 0,1,6,12
+# ndbc_points_sel 0,1,6,12
