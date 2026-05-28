@@ -196,7 +196,7 @@ if __name__ == "__main__":
                                 if (st.shape[0]==wndcal.shape[0]) and (slat.shape[0]==slon.shape[0]) and (hskcal.shape[0]==wndcal.shape[0]) :    
 
                                     indenobs=np.where(swhknobs<min_swh_numval[s])
-                                    if size(indenobs)>1:
+                                    if np.size(indenobs)>1:
                                         hskcal[indenobs[0]]=-999.
 
                                     ast[ii:ii+st.shape[0]]=np.array(st).astype('double')
