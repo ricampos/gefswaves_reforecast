@@ -6,6 +6,7 @@ combine_buoy_alt.py
 
 VERSION AND LAST UPDATE:
  v1.0  06/25/2025
+ v1.1  05/27/2026
 
 PURPOSE:
  Part of the fuzzy verification process and dataset. This script includes NDBC buoy data to points (when available)
@@ -19,6 +20,7 @@ DEPENDENCIES:
 
 AUTHOR and DATE:
  06/25/2025: Ricardo M. Campos, first version, named fuzzy_verification_ProbMaps.py
+ 05/27/2026: Ricardo M. Campos, optimize the code to run faster
 
 PERSON OF CONTACT:
  Ricardo M Campos: ricardo.campos@noaa.gov
@@ -30,15 +32,57 @@ matplotlib.use('Agg')
 import netCDF4 as nc
 import xarray as xr
 import numpy as np
-import wread
 import warnings; warnings.filterwarnings("ignore")
 # netcdf format
 fnetcdf="NETCDF4"
 
+# Observations NDBC, netcdf format
+def tseriesnc_ndbc(fname=None,anh=None):
+    '''
+    Observations NDBC, time series/table, netcdf format
+    Input: file name (example: 46047h2016.nc), and anemometer height (optional)
+    Output: dictionary containing the arrays: time(seconds since 1970),time(datetime64),lat,lon, 
+      and arrays sst,mslp,dwp,tmp,gst(10-m height),wsp(10-m height),wdir,hs,tm,tp,dm
+    '''
+    if fname==None:
+        raise ValueError("NDBC file name must be informed.")
+
+    try:
+        ds = xr.open_dataset(fname); f=nc.Dataset(fname)
+    except:
+        sys.exit(" Cannot open "+fname)
+    else:
+        btp = f.variables['dominant_wpd'][:,0,0]
+        btime = np.array(f.variables['time'][:]).astype('double')
+        f.close(); del f 
+
+        if 'wind_spd' in ds.keys():
+            bwsp = ds['wind_spd'].values[:,0,0]
+            if anh==None:
+                anh=4.1 # NDBC (3M buoys)
+
+            # convert wind speed to 10 meters (DNVGL C-205 Table 2-1, confirmed by https://onlinelibrary.wiley.com/doi/pdf/10.1002/er.6382)
+            bwsp =  np.copy(((10./anh)**(0.12)) * bwsp)
+
+        bhs = ds['wave_height'].values[:,0,0]
+
+        # Automatic and basic Quality Control
+        bwsp[(bwsp<0)|(bwsp>100)]=np.nan
+        bhs[(bhs<0)|(bhs>20)]=np.nan
+        btp[(btp<0)|(btp>30)]=np.nan
+
+        result={'latitude':np.array(ds['latitude'].values[:]),'longitude':np.array(ds['longitude'].values[:]),
+        'time':btime,'wind_spd':bwsp,'hs':bhs,'tp':btp}
+
+        return result
+        ds.close()
+        del ds,btime,bwsp,bhs,btp
+
+
 if __name__ == "__main__":
 
     # Altimeter data, from extract_altimeter.py
-    fname='/work/noaa/marine/ricardo.campos/work/analysis/3assessments/fuzzy_verification/data/Pacific/Altimeter.PointExtract.Pacific_20201001to20250101.nc'
+    fname='/work/noaa/marine/ricardo.campos/work/analysis/3assessments/fuzzy_verification/data/Atlantic/Altimeter.PointExtract.Atlantic_20201001to20260101.nc'
     # Paths
     ndbcp="/work/noaa/marine/ricardo.campos/data/buoys/NDBC/ncformat/wparam"
 
@@ -69,7 +113,7 @@ if __name__ == "__main__":
         for j in range(0,len(years)):
 
             try:
-                res = wread.tseriesnc_ndbc(fname=ndbcp+"/"+pid[i]+"h"+str(years[j])+".nc",anh=None)
+                res = tseriesnc_ndbc(fname=ndbcp+"/"+pid[i]+"h"+str(years[j])+".nc",anh=None)
                 ahs = np.append(ahs,res['hs'])
                 atp = np.append(atp,res['tp'])
                 au10 = np.append(au10,res['wind_spd'])
@@ -80,22 +124,7 @@ if __name__ == "__main__":
             else:
                 print(" Ok "+pid[i]+"h"+str(years[j]))
 
-
         if np.any(ahs):
-
-            # First layer of simple quality-control
-            indq=np.where((ahs>30.)|(ahs<0.0))
-            if np.size(indq)>0:
-                ahs[indq]=np.nan; del indq
-
-            indq=np.where((atp>40.)|(atp<0.0))
-            if np.size(indq)>0:
-                atp[indq]=np.nan; del indq
-
-            indq=np.where((au10>100.)|(au10<0.0))
-            if np.size(indq)>0:
-                au10[indq]=np.nan; del indq
-
             c=0
             for t in range(0,len(mtime)):
                 indt=np.where(np.abs(btime-mtime[t])<1800.)
@@ -113,7 +142,7 @@ if __name__ == "__main__":
 
     print(' ')
     # Save netcdf output file 
-    ncfile = nc.Dataset("Altimeter.Buoy.PointExtract.Pacific_20201001to20250101.nc", "w", format=fnetcdf)
+    ncfile = nc.Dataset("Altimeter.Buoy.PointExtract_20201001to20260101.nc", "w", format=fnetcdf)
     ncfile.history="AODN Altimeter data extracted for fixed point outputs, and NDBC buoy data for those points (when available)"
     # create  dimensions
     ncfile.createDimension('points', pid.shape[0] )
@@ -163,6 +192,6 @@ if __name__ == "__main__":
     vbhs[:,:]=bhs[:,:]; vbu10[:,:]=bu10[:,:]; vbtp[:,:]=btp[:,:]
     # 
     ncfile.close()
-    print("Done. Netcdf ok. New file saved: Altimeter.Buoy.PointExtract_20201001to20250101.nc")
+    print("Done. Netcdf ok. New file saved: Altimeter.Buoy.PointExtract_20201001to20260101.nc")
 
 
