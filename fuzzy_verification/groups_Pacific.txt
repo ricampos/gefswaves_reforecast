@@ -8,5 +8,4 @@ sp_tropical 20,21,22,23
 sp_cwest_trop 22,23
 sp_east 20,25
 sp_center_south 24,25,26
-sp_south 27,28,29
 ndbc_points 0,1,2,3,4,5,6,7
