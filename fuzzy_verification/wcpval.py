@@ -170,11 +170,11 @@ def qm_train(model=None,obs=None,prob=None):
 
     slope,intercept = np.polyfit(np.nanpercentile(model,prob),np.nanpercentile(obs,prob),1)
     # model_cal=np.array((model*slope)+intercept)
-    # print(" QMM linear regression. Slope: "+repr(slope)+"  Intercept: "+repr(intercept))
+    print(" QMM linear regression. Slope: "+repr(slope)+"  Intercept: "+repr(intercept))
 
     return float(slope),float(intercept)
 
-def qmcal(model=None,slope=1.,intercept=0.,pprint='no'):
+def qmcal(model=None,slope=1.,intercept=0.,pprint='yes'):
     """ 
     Univariate linear regression calibration using the Quantile Mapping Method
     Calibration module based on previously trained qm_train
@@ -196,16 +196,19 @@ def qmcal(model=None,slope=1.,intercept=0.,pprint='no'):
     return np.array(model_cal).astype('float')
 
 
-def bias_correction(gdata,obs,spctl,wvar,opath,include_buoy="no"):
+def bias_correction(gdata,obs,spctl,wvar,opath):
     '''
     Bias correction of GEFS hindcast data. 
-    Using altimeter and/or buoy data.
+    Using altimeter data for calibration, and buoy data to validate the results.
     '''
 
     gefs_hindcast = gdata['gefs_hindcast']
 
     gefs_hindcast_bc = np.copy(gefs_hindcast)
     pctlarr = np.arange(spctl,99.9,0.1)
+
+    merr=np.zeros((len(gdata['stations']),len(gdata['ensm'])),'f')*np.nan
+    merr_cal=np.zeros((len(gdata['stations']),len(gdata['ensm'])),'f')*np.nan
 
     for i in range(0,len(gdata['stations'])):
         if gdata['stations'][i] in obs['bid']:
@@ -217,19 +220,6 @@ def bias_correction(gdata,obs,spctl,wvar,opath,include_buoy="no"):
                     indt = np.where( np.abs(gdata['ftime'][j,k]-obs['btime'])<1800. )
                     if np.size(indt)>0:
                         indt=indt[0][0]
-
-                        # Buoy data module
-                        if include_buoy=='yes' and obs['buoy'][inds,indt] > 0. :
-                            if c==0:
-                                fmodel=np.array([gefs_hindcast[j,i,k,:,gdata['indlat'],gdata['indlon']]])
-                                fobs=np.array([np.full( len(gdata['ensm']),obs['buoy'][inds,indt])])
-                            else:
-                                fmodel=np.append(fmodel, np.array([gefs_hindcast[j,i,k,:,gdata['indlat'],gdata['indlon']]]),axis=0)
-                                fobs=np.append(fobs, np.array([np.full( len(gdata['ensm']),obs['buoy'][inds,indt])]),axis=0)
-
-                            c=c+1
-
-                        # Altimeter data module
                         if np.any( np.isnan(obs['alt'][inds,:,:][indt,:]) == False ):
 
                             for p in range(0,obs['mlat'].shape[1]):
@@ -243,8 +233,8 @@ def bias_correction(gdata,obs,spctl,wvar,opath,include_buoy="no"):
                                     L1, L2, t3_p, t4_p = lmom_ratios(gefs_hindcast[j,i,:,0,gdata['indlat'],gdata['indlon']], nmom=4); l1_p = L2 / L1
                                     L1, L2, t3_n, t4_n = lmom_ratios(gefs_hindcast[j,i,:,0,indplat,indplon], nmom=4); l1_n = L2 / L1
 
-                                    if stresult[0]<0.1 and stresult[1]<0.1 and stresult[2]>0.8 and np.abs(l1_p-l1_n)<0.05 and np.abs(t3_p-t3_n)<0.05 and np.abs(t4_p-t4_n)<0.05:
-                                    # if stresult[0]<0.15 and stresult[1]<0.15 and stresult[2]>0.75 and np.abs(l1_p-l1_n)<0.07 and np.abs(t3_p-t3_n)<0.07 and np.abs(t4_p-t4_n)<0.07:
+                                    # if stresult[0]<0.1 and stresult[1]<0.1 and stresult[2]>0.8 and np.abs(l1_p-l1_n)<0.05 and np.abs(t3_p-t3_n)<0.05 and np.abs(t4_p-t4_n)<0.05:
+                                    if stresult[0]<0.15 and stresult[1]<0.15 and stresult[2]>0.75 and np.abs(l1_p-l1_n)<0.07 and np.abs(t3_p-t3_n)<0.07 and np.abs(t4_p-t4_n)<0.07:
 
                                         if c==0:
                                             fmodel=np.array([gefs_hindcast[j,i,k,:,indplat,indplon]])
@@ -260,107 +250,61 @@ def bias_correction(gdata,obs,spctl,wvar,opath,include_buoy="no"):
                                     else:
                                         print(" Neighbour point is statistically different, "+gdata['stations'][i]+". "+repr(j)+", "+repr(k))
 
-            if np.size(fobs)>0.:
-                fmodel_bc = np.copy(fmodel)
-                for j in range(0,len(gdata['ensm'])):
-                    qmm_slope = 1. ; qmm_intercept = 0.
-                    if np.size(np.where(fobs[:,j]>0))>200.:
-                        qmm_slope,qmm_intercept = qm_train(model=fmodel[:,j],obs=fobs[:,j])
-                    elif np.size(np.where(fobs[:,j]>0))>100.:
-                        # does not change the slope
-                        qmm_intercept = np.nanmean( np.nanpercentile(fobs[:,j],pctlarr) - np.nanpercentile(fmodel[:,j],pctlarr) )
+            for j in range(0,len(gdata['ensm'])):
+                if np.size(np.where(fobs[:,j]>0))>100.:
+                    # qmm_slope,qmm_intercept = qm_train(model=fmodel[:,j],obs=fobs[:,j])
+                    qmm_slope=1.
+                    qmm_intercept = np.nanmean( np.nanpercentile(fobs[:,j],pctlarr) - np.nanpercentile(fmodel[:,j],pctlarr) )
+                    # merr = np.array(mvalstats.metrics(fmodel[:,j],fobs[:,j],pctlerr='yes'))[9]
 
                     gefs_hindcast_bc[:,i,:,:,:,:][:,:,j,:,:] = qmcal(model=gefs_hindcast[:,i,:,:,:,:][:,:,j,:,:],slope=qmm_slope,intercept=qmm_intercept)
-                    fmodel_bc[:,j] = qmcal(model=fmodel[:,j],slope=qmm_slope,intercept=qmm_intercept)
                     del qmm_slope,qmm_intercept
-                    print(" QMM bias correction station "+gdata['stations'][i]+"  member"+repr(j))
 
-                # Quick assessment against obs
-                merr = np.zeros((len(gdata['ensm']),12),'f')
-                merr_cal = np.zeros((len(gdata['ensm']),12),'f')
+                    print(" QMM station "+gdata['stations'][i])
+
+            # Quick assessment against buoy (when available)
+            bobs=[]
+            c=0
+            if np.any(obs['buoy'][inds,:] > 0.)==True:
+                for j in range(0,gdata['ftime'].shape[0]):
+                    for k in range(0,gdata['ftime'].shape[1]):
+                        indt = np.where( np.abs(gdata['ftime'][j,k]-obs['btime'])<1800. )
+                        if np.size(indt)>0:
+                            if c==0:
+                                ghcal = np.array([gefs_hindcast_bc[j,i,k,:,gdata['indlat'],gdata['indlon']]])
+                                gh = np.array([gefs_hindcast[j,i,k,:,gdata['indlat'],gdata['indlon']]])
+                            else:
+                                ghcal = np.append(ghcal,np.array([gefs_hindcast_bc[j,i,k,:,gdata['indlat'],gdata['indlon']]]),axis=0)
+                                gh = np.append(gh,np.array([gefs_hindcast[j,i,k,:,gdata['indlat'],gdata['indlon']]]),axis=0)
+
+                            bobs=np.append(bobs,obs['buoy'][inds,indt])
+                            c=c+1
+
                 for j in range(0,len(gdata['ensm'])):
-                    if np.any(fmodel[:,j]>-999.)==True and np.any(fobs[:,j]>-999.)==True :
-                        merr[j,:] = mvalstats.metrics(fmodel[:,j],fobs[:,j],pctlerr='yes')[:]
-                        merr_cal[j,:] = mvalstats.metrics(fmodel_bc[:,j],fobs[:,j],pctlerr='yes')[:]
+                    if np.any(gh[:,j]>0.)==True and np.any(ghcal[:,j]>0.)==True and np.any(bobs>0.)==True :
+                        # RMSE pctl95
+                        merr[i,j] = mvalstats.metrics(gh[:,j],bobs,pctlerr='yes')[9]
+                        merr_cal[i,j] = mvalstats.metrics(ghcal[:,j],bobs,pctlerr='yes')[9]
+                        # Plots
+                        if j==0:
+                            mop=ModelObsPlot(model=[gh[:,j],ghcal[:,j]],obs=bobs,mlabels=["GEFSv12","GEFSv12_BC"],ftag=opath+"/Eval_"+wvar+"_"+gdata['stations'][i]+"_",vaxisname=wvar)
+                            mop.qqplot(); mop.scatterplot(); mop.taylordiagram()
 
+                del ghcal, gh
+
+            del bobs
+
+            if np.any(merr[i,:]>-999.)==True and np.any(merr_cal[i,:]>-999.)==True :
                 fig1 = plt.figure(1,figsize=(5,4.5)); ax = fig1.add_subplot(111)
-                ax.plot(merr[:,0],'k'); ax.plot(merr_cal[:,0],'r')
+                ax.plot(merr[i,:],'k'); ax.plot(merr_cal[i,:],'r')
                 plt.grid(c='grey', ls=':', alpha=0.5,zorder=1)
-                ax.set_xlabel("Ens Members"); ax.set_ylabel("Bias")
+                ax.set_xlabel("Ens Members"); ax.set_ylabel("Bias (Pctl95)")
                 plt.tight_layout()
-                plt.savefig(opath+"/Eval_"+wvar+"_"+gdata['stations'][i]+"_Bias.png", dpi=200, facecolor='w', edgecolor='w',orientation='portrait', format='png',transparent=False, bbox_inches='tight', pad_inches=0.1)
+                plt.savefig(opath+"/Eval_"+wvar+"_"+gdata['stations'][i]+"_BiasPctl95.png", dpi=200, facecolor='w', edgecolor='w',orientation='portrait', format='png',transparent=False, bbox_inches='tight', pad_inches=0.1)
                 plt.close(fig1); del fig1, ax
 
-                fig1 = plt.figure(1,figsize=(5,4.5)); ax = fig1.add_subplot(111)
-                ax.plot(merr[:,1],'k'); ax.plot(merr_cal[:,1],'r')
-                plt.grid(c='grey', ls=':', alpha=0.5,zorder=1)
-                ax.set_xlabel("Ens Members"); ax.set_ylabel("Bias")
-                plt.tight_layout()
-                plt.savefig(opath+"/Eval_"+wvar+"_"+gdata['stations'][i]+"_RMSE.png", dpi=200, facecolor='w', edgecolor='w',orientation='portrait', format='png',transparent=False, bbox_inches='tight', pad_inches=0.1)
-                plt.close(fig1); del fig1, ax
-
-                fmodel = fmodel.flatten()
-                fmodel_bc = fmodel_bc.flatten()
-                fobs = fobs.flatten()
-
-                mop=ModelObsPlot(model=[fmodel,fmodel_bc],obs=fobs,mlabels=["GEFSv12","GEFSv12_BC"],ftag=opath+"/Eval_"+gdata['stations'][i]+"_",vaxisname=wvar)
-                mop.qqplot(); mop.scatterplot(); mop.taylordiagram()
 
     return gefs_hindcast_bc
-
-
-def data_assimilation(gefs_hindcast_bc,gdata,obs,spctl,wvar,opath,include_buoy="yes"):
-    '''
-    Data assimilation of GEFS hindcast data. 
-    Using altimeter and/or buoy data.
-    '''
-
-    gefs_hindcast = np.nanmean(gefs_hindcast_bc[:,:,:,:,gdata['indlat'],gdata['indlon']],axis=3)
-    gefs_hindcast_da = np.copy(gefs_hindcast)
-
-    bda=0; sda=0
-    for i in range(0,len(gdata['stations'])):
-        if gdata['stations'][i] in obs['bid']:
-            inds=np.where(gdata['stations'][i]==obs['bid'])[0][0]
-            for j in range(0,gdata['ftime'].shape[0]):
-                for k in range(0,gdata['ftime'].shape[1]):
-
-                    indt = np.where( np.abs(gdata['ftime'][j,k]-obs['btime'])<1800. )
-                    if np.size(indt)>0:
-                        indt=indt[0][0]
-
-                        # Buoy data module
-                        if include_buoy=='yes' and np.nanmean(obs['buoy'][inds,indt]) > 0.1 :
-                            gefs_hindcast_da[j,i,k] = np.nanmean(obs['buoy'][inds,indt])
-                            bda=bda+1
-
-                        # Altimeter data module
-                        if np.nanmean(obs['alt'][inds,indt,8]) > 0.1 :
-                            gefs_hindcast_da[j,i,k] = np.nanmean(obs['alt'][inds,indt,8])
-                            sda=sda+1
-
-    print(" Total of "+repr(bda)+" buoy records assimilated")
-    print(" Total of "+repr(sda)+" altimeter records assimilated")
-
-    return gefs_hindcast_da, bda, sda
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ---- STATISTICAL MODELLING -----

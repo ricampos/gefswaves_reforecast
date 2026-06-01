@@ -21,7 +21,11 @@ PURPOSE:
   from consecutive cycles.
 
 USAGE:
- Input arguments: see the first block and input parameters below
+ Four input arguments are required:
+ - Station ID (41048 etc)
+ - Forecast Lead Time (Day), Initial (ex. 7)
+ - Forecast Lead Time (Day), Final (ex. 14)
+ - Output path where output files will be saved.
 
 DEPENDENCIES:
  See the imports below.
@@ -57,28 +61,45 @@ matplotlib.rc('xtick', labelsize=sl); matplotlib.rc('ytick', labelsize=sl); matp
 
 if __name__ == "__main__":
 
-    # point manual selection (index)
-    bid = np.array([15,16,17]).astype('int')
-    oceaname = "Atlantic"
-    groupname = "na_labrador_greenland"
-    lbid = len(bid)
+    # Ocean (Pacific, Atlantic)
+    nocean=str(sys.argv[1])
+    # Region ID (group of points), for ex: 1, 2, 3 read in groups_Atlantic.txt or groups_Pacific.txt
+    grpid=int(sys.argv[2]) 
     # variable (u10 or hs)
-    wvar='u10'
+    wvar=str(sys.argv[3]) 
+
+    WPATH="/work/noaa/marine/ricardo.campos/work/analysis/3assessments/fuzzy_verification"
+
+    # read group info
+    dgroups = {}
+    with open(WPATH+"/groups_"+nocean+".txt", "r") as file:
+        for line in file:
+            # Strip trailing whitespace/newlines and skip empty lines
+            line = line.strip()
+            if not line:
+                continue
+            
+            parts = line.split()         
+            if len(parts) == 2:
+                group_name = parts[0]  # This is already a string
+                numbers_array = np.fromstring(parts[1], dtype=int, sep=',')
+                dgroups[group_name] = numbers_array
+
+    # --------------------
+
+    grpname=str(list(dgroups.keys())[grpid])
+    bid = dgroups[grpname]
+    lbid = len(bid)
     # Forecast Lead Time (Day) and intervall
     ltime1=7
     ltime2=14
     # output path
-    # opath="/home/ricardo/work/noaa/analysis/Week2ProbForecast/3assessments/fuzzy_verification/output"
-    opath="/work/noaa/marine/ricardo.campos/work/analysis/3assessments/fuzzy_verification/output/"+oceaname+"/"+groupname
+    opath=WPATH+"/output/"+nocean+"/"+grpname
     # file tag for output file names
     ftag=opath+"/Validation_"+wvar+"_"
 
     # Observations
-    # fobsname="/media/ricardo/ssdrmc/analysis/3assessments/fuzzy_verification/data/Altimeter.Buoy.PointExtract.Pacific_20201001to20250101.nc"
-    fobsname="/work/noaa/marine/ricardo.campos/work/analysis/3assessments/fuzzy_verification/data/"+oceaname+"/Altimeter.Buoy.PointExtract."+oceaname+"_20201001to20250101.nc"
-    # ----------
-
-
+    fobsname=WPATH+"/data/"+nocean+"/Altimeter.Buoy.PointExtract_20201001to20260101.nc"
     # obs = read_obs(fobsname,wvar,"mean")
     obs = read_obs(fobsname,wvar,"max")
 
@@ -106,7 +127,7 @@ if __name__ == "__main__":
     print(" Reading Model Data ...")
     # list of netcdf files generated with buildfuzzydataset.py
     # ls -d $PWD/*.nc > list.txt &
-    wlist = np.atleast_1d(np.loadtxt("list_"+oceaname+".txt",dtype=str)) 
+    wlist = np.atleast_1d(np.loadtxt("list_"+nocean+".txt",dtype=str)) 
     gdata = read_data(wlist,bid,ltime1,ltime2,wvar)
     indlat = gdata['indlat']; indlon = gdata['indlon']
     print(" Reading Model Data, OK")
@@ -242,7 +263,7 @@ if __name__ == "__main__":
             df = pd.DataFrame(bdata)
             df.to_csv(ftag+"ProbabilisticVal_BSS_Lev"+repr(np.round(fqlev[i],2))+".csv",sep='\t', index=False)
         except:
-		    print("  - Did not compute Brier skill score "+repr(qlev[i]))
+            print("  - Did not compute Brier skill score "+repr(qlev[i]))
         else:
             print("  - Brier skill score for "+repr(qlev[i])+" ok")
 
@@ -282,7 +303,7 @@ if __name__ == "__main__":
             df = pd.DataFrame(bdata)
             df.to_csv(ftag+"ProbabilisticVal_GEFShindcast_ROCauc_Lev"+repr(np.round(fqlev[i],2))+".csv",sep='\t', index=False)
         except:
-		    print("  - Did not generate ROC curve for "+repr(qlev[i]))
+            print("  - Did not generate ROC curve for "+repr(qlev[i]))
         else:
             print("  - ROC curve for "+repr(qlev[i])+" ok")
 
@@ -315,11 +336,10 @@ if __name__ == "__main__":
             reliability_curve(true_binary,prob_results,cfreq,mlabels,nbins,pmax,fftag)
 
         except:
-		    print("  - Did not compute Reliability Curve for "+repr(qlev[i]))
+            print("  - Did not compute Reliability Curve for "+repr(qlev[i]))
         else:
             print("  - Reliability Curve for "+repr(qlev[i])+" ok")
 
     plt.close('all')
     print(" Reliability Curve, OK")
-
 
