@@ -47,6 +47,7 @@ PERSON OF CONTACT:
 
 import matplotlib
 matplotlib.use('Agg')
+import os
 import numpy as np
 import sys
 import pandas as pd
@@ -67,6 +68,9 @@ if __name__ == "__main__":
     grpid=int(sys.argv[2]) 
     # variable (u10 or hs)
     wvar=str(sys.argv[3]) 
+    # season (none or summer etc)
+    season = 'summer'
+    idseason = [6,7,8]
 
     WPATH="/work/noaa/marine/ricardo.campos/work/analysis/3assessments/fuzzy_verification"
 
@@ -94,7 +98,11 @@ if __name__ == "__main__":
     ltime1=7
     ltime2=14
     # output path
-    opath=WPATH+"/output/"+nocean+"/"+grpname
+    if season=='none':
+        opath=WPATH+"/output/"+nocean+"/"+grpname
+    else:
+        opath=WPATH+"/output/seasonal/"+season+"/"+nocean+"/"+grpname
+
     # file tag for output file names
     ftag=opath+"/Validation_"+wvar+"_"
 
@@ -127,8 +135,16 @@ if __name__ == "__main__":
     print(" Reading Model Data ...")
     # list of netcdf files generated with buildfuzzydataset.py
     # ls -d $PWD/*.nc > list.txt &
-    wlist = np.atleast_1d(np.loadtxt("list_"+nocean+".txt",dtype=str)) 
+    wlist = np.atleast_1d(np.loadtxt("list_"+nocean+".txt",dtype=str))
+
+    if season != 'none':
+        print(" Seasonal analysis: "+season)
+        months = np.array([int(os.path.basename(f).split('.')[2][4:6]) for f in wlist])
+        s_mask = np.isin(months, idseason)
+        wlist = wlist[s_mask]
+
     gdata = read_data(wlist,bid,ltime1,ltime2,wvar)
+
     indlat = gdata['indlat']; indlon = gdata['indlon']
     print(" Reading Model Data, OK")
 

@@ -36,7 +36,7 @@ if __name__ == "__main__":
     plt.close('all')
     plt.figure(figsize=(7,5))
     ax = plt.axes(projection=ccrs.PlateCarree(central_longitude=-90))
-    ax.set_extent([125,300,-65,65.], crs=ccrs.PlateCarree())
+    ax.set_extent([125,300,-50,65.], crs=ccrs.PlateCarree())
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True, linewidth=0.5, color='grey', alpha=0.5, linestyle='--')
     gl.xlabel_style = {'size': 9, 'color': 'k','rotation':0}; gl.ylabel_style = {'size': 9, 'color': 'k','rotation':0}
     ax.add_feature(cartopy.feature.OCEAN,facecolor=("white"))
