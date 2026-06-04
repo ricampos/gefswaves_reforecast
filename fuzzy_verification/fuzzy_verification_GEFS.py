@@ -76,7 +76,12 @@ if __name__ == "__main__":
 
     # read group info
     dgroups = {}
-    with open(WPATH+"/groups_"+nocean+".txt", "r") as file:
+    if season=='none':
+        fgname=WPATH+"/groups_"+nocean+".txt"
+    else:
+        fgname=WPATH+"/groups_seasonal_"+nocean+".txt"
+
+    with open(fgname, "r") as file:
         for line in file:
             # Strip trailing whitespace/newlines and skip empty lines
             line = line.strip()
