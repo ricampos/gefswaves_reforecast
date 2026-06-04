@@ -6,8 +6,9 @@ DIRSCRIPTS="/work/noaa/marine/ricardo.campos/work/analysis/3assessments/fuzzy_ve
 cd ${DIRSCRIPTS}
 
 for NOCEAN in Atlantic Pacific; do
-  total_lines=$(wc -l < "groups_"${NOCEAN}".txt")
-  for ((GRPID=0; GRPID<=total_lines; GRPID++)); do
+  # total_lines=$(wc -l < "groups_"${NOCEAN}".txt")
+  total_lines=$(wc -l < "groups_seasonal_"${NOCEAN}".txt")
+  for ((GRPID=0; GRPID<total_lines; GRPID++)); do
     for WVAR in hs u10; do
       export NOCEAN=${NOCEAN}
       export GRPID=${GRPID}
