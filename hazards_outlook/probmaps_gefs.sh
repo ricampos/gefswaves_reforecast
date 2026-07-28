@@ -69,14 +69,14 @@ outpath_line=$(grep 'outpath' "${PYCYAML}")
 OUTPATH=$(echo "$outpath_line" | awk -F': ' '{print $2}')
 
 # Forecast cycle
-YEAR=`date +%Y`
-MONTH=`date +%m`
-DAY=`date +%d`
+# YEAR=`date +%Y`
+# MONTH=`date +%m`
+# DAY=`date +%d`
 
-# pa=2 #  days into the past. pa=1 runs using yesterday's cycle
-# YEAR=`date --date=-$pa' day' '+%Y'`
-# MONTH=`date --date=-$pa' day' '+%m'`
-# DAY=`date --date=-$pa' day' '+%d'`
+pa=0 #  days into the past. pa=1 runs using yesterday's cycle etc
+YEAR=`date --date=-$pa' day' '+%Y'`
+MONTH=`date --date=-$pa' day' '+%m'`
+DAY=`date --date=-$pa' day' '+%d'`
 HOUR="00" # first cycle 00Z
 
 # Check GEFv12 is complete and ready.
@@ -91,12 +91,12 @@ while [ "$FSIZE" -lt 1000000 ] && [ "$TRIES" -le 144 ]; do
     sleep 300
   fi
   # Check if the last file (member 30, lead time 384h) is complete
-  test -f $GEFSMDIR/gefs.$YEAR$MONTH$DAY/$HOUR/wave/gridded/gefs.wave.t${HOUR}z.p30.global.0p25.f384.grib2
+  test -f $GEFSMDIR/GEFSv12Waves_$YEAR$MONTH$DAY$HOUR/gefs.wave.$YEAR$MONTH$DAY.30.global.0p25.f384.grib2
   TE=$?
   if [ ${TE} -eq 1 ]; then
     FSIZE=0
   else
-    FSIZE=$(du -sb "$GEFSMDIR/gefs.$YEAR$MONTH$DAY/$HOUR/wave/gridded/gefs.wave.t${HOUR}z.p30.global.0p25.f384.grib2" | awk '{print $1}')
+    FSIZE=$(du -sb "$GEFSMDIR/GEFSv12Waves_$YEAR$MONTH$DAY$HOUR/gefs.wave.$YEAR$MONTH$DAY.30.global.0p25.f384.grib2" | awk '{print $1}')
   fi
 
   TRIES=`expr $TRIES + 1`

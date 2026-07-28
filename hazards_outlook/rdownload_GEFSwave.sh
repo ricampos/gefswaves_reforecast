@@ -1,11 +1,28 @@
 #!/bin/bash
 # bash rdownload_GEFSwave.sh 00 1
+#
+# 07/28/2026: Ricardo M. Campos - added a lock file so a new cron-triggered
+#   run cannot start while a previous one is still going. Without this,
+#   a run stuck retrying stale/404 data could still be alive when the
+#   next day's cron fired, and the two (or more) instances would run
+#   concurrently, interleaving output in cron_log.txt and competing for
+#   bandwidth. Also wrapped the actual download in `timeout` as a backstop
+#   so a run can't linger indefinitely even if something unexpected stalls.
 
 set -euo pipefail
+
+# ---- prevent overlapping runs -------------------------------------------
+LOCKFILE="/tmp/rdownload_GEFSwave.lock"
+exec 200>"$LOCKFILE"
+if ! flock -n 200; then
+  echo "$(date): another instance of rdownload_GEFSwave.sh is already running - exiting."
+  exit 1
+fi
+# --------------------------------------------------------------------------
+
 export USER_IS_ROOT=0
 export MODULEPATH=/etc/scl/modulefiles:/apps/lmod/lmod/modulefiles/Core:/apps/modules/modulefiles/Linux:/apps/modules/modulefiles
 source /apps/lmod/lmod/init/bash
-
 # cycle 00,06,12,18
 # HCYCLE="00"
 HCYCLE="$1"
@@ -25,8 +42,14 @@ DIRW=${DIRS}/GEFSv12Waves_${WTIME}${HCYCLE}
 if [ ! -d "${DIRW}" ]; then
    mkdir -p "${DIRW}"
 fi
-
-bash ${DIRS}/download_GEFSwave.sh ${WTIME} ${HCYCLE} ${DIRW}
+# Wrapped in `timeout` as a backstop: if a run somehow can't finish a
+# full cycle in 3 hours, kill it cleanly instead of letting it linger
+# into the next scheduled cron trigger.
+timeout 3h bash ${DIRS}/download_GEFSwave.sh ${WTIME} ${HCYCLE} ${DIRW}
+DL_RC=$?
+if [ $DL_RC -eq 124 ]; then
+  echo "$(date): WARNING - download_GEFSwave.sh for ${WTIME}${HCYCLE} hit the 3h timeout and was killed."
+fi
 
 # clean old data
 # Get the cutoff date in YYYYMMDD format

@@ -12,6 +12,7 @@ VERSION AND LAST UPDATE:
  v2.0  09/11/2024
  v2.1  12/17/2025
  v2.2  01/06/2025
+ v2.3  07/22/2026
 
 PURPOSE:
  This program makes the probability maps based on the NOAA Global Ensemble
@@ -61,6 +62,10 @@ AUTHOR and DATE:
  12/17/2025: Ricardo M. Campos, inclusion of KML with polygons and contours, able to open in 
   Google Earth.
  01/06/2025: Ricardo M. Campos, improved KML output.
+ 07/22/2026: Ricardo M. Campos, fixed contour_to_kml for matplotlib >=3.10, which
+  removed QuadContourSet.collections. Each level band is now contoured with its
+  own contourf() call instead of indexing into a combined ContourSet, so the
+  code works across matplotlib versions.
 
 PERSON OF CONTACT:
  Ricardo M Campos: ricardo.campos@noaa.gov
@@ -147,16 +152,30 @@ def contour_to_kml(lon, lat, Z, levels, lname, tstart, tend, pcolors, filename):
     bg.altitudemode = simplekml.AltitudeMode.absolute
 
     # --- 3. CONTOURS ---
-    csf = plt.contourf(lon, lat, Z, levels=levels)
-    plt.close()
-
-    for i in range(len(csf.collections)):
+    # matplotlib >=3.10 removed QuadContourSet.collections (previously one
+    # contourf() call returned one PathCollection per level band, indexed
+    # via csf.collections[i]). To stay compatible across matplotlib
+    # versions, each level band is now contoured with its own separate
+    # contourf() call, so there's no need to index into a combined,
+    # multi-level ContourSet at all.
+    for i in range(len(levels) - 1):
         lvl_lower = levels[i]
-        lvl_upper = levels[i + 1] if i + 1 < len(levels) else levels[i]
+        lvl_upper = levels[i + 1]
         folder = kml.newfolder(name=f"P {lvl_lower:.2f}–{lvl_upper:.2f}")
 
+        csf = plt.contourf(lon, lat, Z, levels=[lvl_lower, lvl_upper])
+        plt.close()
+
+        # matplotlib < 3.8: ContourSet.collections[0].get_paths()
+        # matplotlib >= 3.10: ContourSet.get_paths() directly (ContourSet
+        # itself is now a single Collection)
+        if hasattr(csf, 'collections'):
+            paths = csf.collections[0].get_paths()
+        else:
+            paths = csf.get_paths()
+
         polys = []
-        for path in csf.collections[i].get_paths():
+        for path in paths:
             for poly_coords in path.to_polygons():
                 if len(poly_coords) < 3:
                     continue
@@ -307,10 +326,11 @@ if __name__ == "__main__":
     for t in range(0,auxltime.shape[0]):
         for enm in range(0,nenm):
 
-            if enm==0:
-                fname=gefspath+"gefs."+fcdate+"/"+fchour+"/wave/gridded/gefs.wave.t"+fchour+"z.c"+str(enm).zfill(2)+".global.0p25.f"+str(auxltime[t]).zfill(3)+".grib2"
-            else:
-                fname=gefspath+"gefs."+fcdate+"/"+fchour+"/wave/gridded/gefs.wave.t"+fchour+"z.p"+str(enm).zfill(2)+".global.0p25.f"+str(auxltime[t]).zfill(3)+".grib2"
+            # if enm==0:
+            #    fname=gefspath+"gefs."+fcdate+"/"+fchour+"/wave/gridded/gefs.wave.t"+fchour+"z.c"+str(enm).zfill(2)+".global.0p25.f"+str(auxltime[t]).zfill(3)+".grib2"
+            # else:
+            #    fname=gefspath+"gefs."+fcdate+"/"+fchour+"/wave/gridded/gefs.wave.t"+fchour+"z.p"+str(enm).zfill(2)+".global.0p25.f"+str(auxltime[t]).zfill(3)+".grib2"
+            fname=gefspath+"GEFSv12Waves_"+fcdate+fchour+"/gefs.wave."+fcdate+"."+str(enm).zfill(2)+".global.0p25.f"+str(auxltime[t]).zfill(3)+".grib2"
 
             if c==0:
                 ds = xr.open_dataset(fname, engine='cfgrib')
@@ -477,4 +497,3 @@ if __name__ == "__main__":
         print("   Plot ... qlev "+repr(qlev[i]))
 
     print(" 3. Probability Plots ... OK"); print(" ")
-

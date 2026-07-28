@@ -1,7 +1,7 @@
 # Configuration file for probmaps_gefs.sh and probmaps_gefs.py
 
 # GEFv12 data path, where the gefs.YYYYMMDD/00/wave/gridded/*.grib2 field outputs are located:
-gefspath: /media/ricardo/ssdrmc/analysis/products/probmaps/data/nccf/com/gens/prod
+gefspath: /media/ricardo/ssdrmc/analysis/products/probmaps/data/GEFS
 
 # Python script path and file:
 pyscript: /media/ricardo/ssdrmc/analysis/products/probmaps/probmaps_gefs.py
